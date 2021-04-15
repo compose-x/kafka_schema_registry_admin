@@ -128,7 +128,9 @@ class SchemaRegistry(BaseModel):
             return req.json()
         req.raise_for_status()
 
-    def post_subject_schema(self, subject_name, definition, schema_type=None, for_key=False):
+    def post_subject_schema(
+        self, subject_name, definition, schema_type=None, for_key=False
+    ):
         """
         Method that returns the schema ID and details if already exists, from the schema definition
 
@@ -188,7 +190,9 @@ class SchemaRegistry(BaseModel):
             )
         return req
 
-    def post_subject_version(self, subject_name, definition, schema_type=None, for_key=False):
+    def post_subject_version(
+        self, subject_name, definition, schema_type=None, for_key=False
+    ):
         if not for_key:
             subject_name = f"{subject_name}-value"
         else:
@@ -243,7 +247,9 @@ class SchemaRegistry(BaseModel):
                 req = requests.delete(permanent_url)
         return req
 
-    def delete_subject(self, subject_name, version_id=None, permanent=False, for_key=False):
+    def delete_subject(
+        self, subject_name, version_id=None, permanent=False, for_key=False
+    ):
         if not for_key:
             subject_name = f"{subject_name}-value"
         else:
@@ -371,7 +377,7 @@ class SchemaRegistry(BaseModel):
         definition_type=None,
         references=None,
         as_bool=False,
-        for_key=False
+        for_key=False,
     ):
         if not for_key:
             subject_name = f"{subject_name}-value"

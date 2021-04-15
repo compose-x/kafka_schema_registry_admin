@@ -1,7 +1,7 @@
 github_url = "https://github.com/ews-network/kafka_schema_registry_admin"
 
 [tool.tbump.version]
-current = "0.0.1"
+current = "0.0.2"
 
 regex = '''
   (?P<major>\d+)
