@@ -128,7 +128,7 @@ class SchemaRegistry(BaseModel):
             return req.json()
         req.raise_for_status()
 
-    def post_subject_schema(self, subject_name, definition, schema_type=None):
+    def post_subject_schema(self, subject_name, definition, schema_type=None, for_key=False):
         """
         Method that returns the schema ID and details if already exists, from the schema definition
 
@@ -138,6 +138,10 @@ class SchemaRegistry(BaseModel):
         :return:
         :raises: requests.exceptions
         """
+        if not for_key:
+            subject_name = f"{subject_name}-value"
+        else:
+            subject_name = f"{subject_name}-key"
         if isinstance(definition, dict):
             definition = str(json.dumps(definition))
         if schema_type is None:
@@ -184,7 +188,12 @@ class SchemaRegistry(BaseModel):
             )
         return req
 
-    def post_subject_version(self, subject_name, definition, schema_type=None):
+    def post_subject_version(self, subject_name, definition, schema_type=None, for_key=False):
+        if not for_key:
+            subject_name = f"{subject_name}-value"
+        else:
+            subject_name = f"{subject_name}-key"
+
         req = self.post_subject_version_raw(subject_name, definition, schema_type)
         if req.status_code == 200:
             return req.json()
@@ -234,7 +243,12 @@ class SchemaRegistry(BaseModel):
                 req = requests.delete(permanent_url)
         return req
 
-    def delete_subject(self, subject_name, version_id=None, permanent=False):
+    def delete_subject(self, subject_name, version_id=None, permanent=False, for_key=False):
+        if not for_key:
+            subject_name = f"{subject_name}-value"
+        else:
+            subject_name = f"{subject_name}-key"
+
         req = self.delete_subject_raw(subject_name, version_id, permanent)
         if req.status_code == 200:
             return req.json()
@@ -357,7 +371,13 @@ class SchemaRegistry(BaseModel):
         definition_type=None,
         references=None,
         as_bool=False,
+        for_key=False
     ):
+        if not for_key:
+            subject_name = f"{subject_name}-value"
+        else:
+            subject_name = f"{subject_name}-key"
+
         req = self.post_compatibility_subjects_versions_raw(
             subject_name, version_id, definition, definition_type, references
         )
