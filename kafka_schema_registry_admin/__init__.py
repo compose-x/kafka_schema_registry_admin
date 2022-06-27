@@ -1,4 +1,3 @@
-#  -*- coding: utf-8 -*-
 # SPDX-License-Identifier: LGPL-3.0-only
 # Copyright 2021 John Mille <john@ews-network.net>
 
@@ -6,4 +5,4 @@
 
 __author__ = """JohnPreston"""
 __email__ = "john@ews-network.net"
-__version__ = "0.0.2"
+__version__ = "0.1.0"
