@@ -1,4 +1,3 @@
-#  -*- coding: utf-8 -*-
 # SPDX-License-Identifier: LGPL-3.0-only
 # Copyright 2021 John Mille <john@ews-network.net>
 
@@ -6,13 +5,13 @@
 Main module for schema_registry_admin
 """
 
-import requests
 import json
-from logging import getLogger
 from enum import Enum
+from logging import getLogger
 from typing import List, Optional
-from pydantic import BaseModel, Extra, Field, AnyUrl
 
+import requests
+from pydantic import AnyUrl, BaseModel, Extra, Field
 
 LOG = getLogger()
 LOG.setLevel("WARN")
@@ -66,6 +65,23 @@ class SchemaRegistry(BaseModel):
         :raises: requests.exceptions.HTTPError
         """
         url = f"{self.SchemaRegistryUrl}/subjects"
+        LOG.debug(url)
+        if not self.Username:
+            req = requests.get(url)
+        else:
+            req = requests.get(url, auth=(self.Username, self.Password))
+        if req.status_code == 200:
+            return req.json()
+        req.raise_for_status()
+
+    def get_subject_versions(self, subject_name: str):
+        """
+        Method to get the list of subjects in the schema registry
+        https://docs.confluent.io/platform/current/schema-registry/develop/api.html#get--subjects-(string-%20subject)-versions
+
+        :raises: requests.exceptions.HTTPError
+        """
+        url = f"{self.SchemaRegistryUrl}/subjects/{subject_name}/versions"
         LOG.debug(url)
         if not self.Username:
             req = requests.get(url)

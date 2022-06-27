@@ -1,7 +1,33 @@
+
+[tool.poetry]
+name = "kafka_schema_registry_admin"
+version = "0.1.0"
+description = "Pure HTTP client to manage schemas in Schema Registry"
+authors = ["John Preston <john@ews-network.net>"]
+license = "LGPL-3.0-only"
+
+[tool.poetry.dependencies]
+python = "^3.7"
+requests = "^2.28.0"
+pydantic = "^1.9.1"
+
+[tool.poetry.dev-dependencies]
+black = "^22.3.0"
+isort = "^5.10.1"
+coverage = "^6.4.1"
+Sphinx = "^5.0.2"
+pre-commit = "^2.19.0"
+pytest = "^7.1.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.tbump]
 github_url = "https://github.com/ews-network/kafka_schema_registry_admin"
 
 [tool.tbump.version]
-current = "0.0.2"
+current = "0.1.0"
 
 regex = '''
   (?P<major>\d+)
@@ -17,13 +43,11 @@ message_template = "Bump to {new_version}"
 tag_template = "v{new_version}"
 
 [[tool.tbump.file]]
-src = "setup.py"
-
-[[tool.tbump.file]]
-src = "setup.cfg"
-
-[[tool.tbump.file]]
 src = "kafka_schema_registry_admin/__init__.py"
+
+[[tool.tbump.file]]
+src = "pyproject.toml"
+
 
 [[tool.tbump.before_commit]]
 name = "Files format"

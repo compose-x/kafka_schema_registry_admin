@@ -86,7 +86,7 @@ dist: clean ## builds source and wheel package
 	ls -l dist
 
 install: clean ## install the package to the active Python's site-packages
-	python setup.py install
+	pip install .
 
 conform	: ## Conform to a standard of coding syntax
-	black kafka_schema_registry_admin tests setup.py
+	black kafka_schema_registry_admin tests
