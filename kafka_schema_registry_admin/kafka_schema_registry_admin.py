@@ -91,6 +91,23 @@ class SchemaRegistry(BaseModel):
             return req.json()
         req.raise_for_status()
 
+    def get_subject_versions_schema(self, subject_name: str, version_id: int):
+        """
+        Method to get the schema of a subject in a specific version
+        https://docs.confluent.io/platform/current/schema-registry/develop/api.html#get--subjects-(string-%20subject)-versions-(versionId-%20version)-schema
+
+        :raises: requests.exceptions.HTTPError
+        """
+        url = f"{self.SchemaRegistryUrl}/subjects/{subject_name}/versions/{version_id}/schema"
+        LOG.debug(url)
+        if not self.Username:
+            req = requests.get(url)
+        else:
+            req = requests.get(url, auth=(self.Username, self.Password))
+        if req.status_code == 200:
+            return req.json()
+        req.raise_for_status()
+
     def get_all_schemas(self):
         """
         Method to get all the schemas in the schema registry
