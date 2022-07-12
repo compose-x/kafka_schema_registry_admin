@@ -425,3 +425,25 @@ class SchemaRegistry(BaseModel):
                 return req.json()["is_compatible"]
             return req
         req.raise_for_status()
+
+    def put_compatibility_subject_config_raw(self, subject_name, compatibility):
+        url = f"{self.SchemaRegistryUrl}/config/{subject_name}/"
+        LOG.debug(url)
+
+        payload = {"compatibility": compatibility}
+        if self.Username:
+            req = requests.put(
+                url,
+                headers=self.post_headers,
+                json=payload,
+                auth=(self.Username, self.Password),
+            )
+        else:
+            req = requests.put(url, headers=self.post_headers, json=payload)
+        return req
+
+    def put_compatibility_subject_config(self, subject_name, compatibility):
+        req = self.put_compatibility_subject_config_raw(subject_name, compatibility)
+        if req.status_code == 200:
+            return req
+        req.raise_for_status()
