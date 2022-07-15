@@ -161,9 +161,7 @@ class SchemaRegistry(BaseModel):
             return req.json()
         req.raise_for_status()
 
-    def post_subject_schema(
-        self, subject_name, definition, schema_type=None, for_key=False
-    ):
+    def post_subject_schema(self, subject_name, definition, schema_type=None):
         """
         Method that returns the schema ID and details if already exists, from the schema definition
 
@@ -173,10 +171,6 @@ class SchemaRegistry(BaseModel):
         :return:
         :raises: requests.exceptions
         """
-        if not for_key:
-            subject_name = f"{subject_name}-value"
-        else:
-            subject_name = f"{subject_name}-key"
         if isinstance(definition, dict):
             definition = str(json.dumps(definition))
         if schema_type is None:
@@ -410,13 +404,7 @@ class SchemaRegistry(BaseModel):
         definition_type=None,
         references=None,
         as_bool=False,
-        for_key=False,
     ):
-        if not for_key:
-            subject_name = f"{subject_name}-value"
-        else:
-            subject_name = f"{subject_name}-key"
-
         req = self.post_compatibility_subjects_versions_raw(
             subject_name, version_id, definition, definition_type, references
         )
