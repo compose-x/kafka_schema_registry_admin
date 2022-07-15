@@ -220,11 +220,6 @@ class SchemaRegistry(BaseModel):
     def post_subject_version(
         self, subject_name, definition, schema_type=None, for_key=False
     ):
-        if not for_key:
-            subject_name = f"{subject_name}-value"
-        else:
-            subject_name = f"{subject_name}-key"
-
         req = self.post_subject_version_raw(subject_name, definition, schema_type)
         if req.status_code == 200:
             return req.json()
@@ -277,11 +272,6 @@ class SchemaRegistry(BaseModel):
     def delete_subject(
         self, subject_name, version_id=None, permanent=False, for_key=False
     ):
-        if not for_key:
-            subject_name = f"{subject_name}-value"
-        else:
-            subject_name = f"{subject_name}-key"
-
         req = self.delete_subject_raw(subject_name, version_id, permanent)
         if req.status_code == 200:
             return req.json()
