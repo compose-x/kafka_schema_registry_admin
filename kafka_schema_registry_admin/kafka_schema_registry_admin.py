@@ -255,7 +255,6 @@ class SchemaRegistry(BaseModel):
             url = f"{url}/versions/{version_id}"
         LOG.debug(url)
         if self.Username:
-
             req = requests.delete(url, auth=(self.Username, self.Password))
             if permanent:
                 permanent_url = f"{url}?permanent=true"
