@@ -1,17 +1,22 @@
-# SPDX-License-Identifier: LGPL-3.0-only
+# SPDX-License-Identifier: Apache License 2.0
 # Copyright 2021 John Mille <john@ews-network.net>
 
 """
 Main module for schema_registry_admin
 """
 
+from __future__ import annotations
+
 import json
 from enum import Enum
 from logging import getLogger
-from typing import List, Optional
+from typing import Any, Optional
 
 import requests
-from pydantic import AnyUrl, BaseModel, Extra, Field
+from pydantic import AnyUrl, BaseModel, Field
+
+from .client_wrapper import Client
+from .client_wrapper.errors import GenericNotFound
 
 LOG = getLogger()
 LOG.setLevel("WARN")
@@ -23,15 +28,6 @@ class Type(Enum):
     PROTOBUFF = "PROTOBUF"
 
 
-class DefinitionDocument(BaseModel):
-    class Config:
-        extra = Extra.allow
-
-    name: str
-    namespace: str
-    fields: List
-
-
 class SchemaRegistry(BaseModel):
     SchemaRegistryUrl: Optional[AnyUrl] = Field(
         None,
@@ -39,14 +35,7 @@ class SchemaRegistry(BaseModel):
     )
     Username: Optional[str] = Field("", description="Username for Authentication")
     Password: Optional[str] = Field("", description="Password for Authentication")
-
-    default_headers = {
-        "Accept": "application/json",
-    }
-    post_headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/vnd.schemaregistry.v1+json",
-    }
+    client: Optional[Any] = None
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -56,6 +45,7 @@ class SchemaRegistry(BaseModel):
             raise KeyError(
                 "When specifying credentials, you must specify both Username and Password"
             )
+        self.client: Client = Client(str(self.SchemaRegistryUrl))
 
     def get_all_subjects(self):
         """
@@ -64,12 +54,7 @@ class SchemaRegistry(BaseModel):
 
         :raises: requests.exceptions.HTTPError
         """
-        url = f"{self.SchemaRegistryUrl}/subjects"
-        LOG.debug(url)
-        if not self.Username:
-            req = requests.get(url)
-        else:
-            req = requests.get(url, auth=(self.Username, self.Password))
+        req = self.client.get("/subjects")
         if req.status_code == 200:
             return req.json()
         req.raise_for_status()
@@ -81,12 +66,7 @@ class SchemaRegistry(BaseModel):
 
         :raises: requests.exceptions.HTTPError
         """
-        url = f"{self.SchemaRegistryUrl}/subjects/{subject_name}/versions"
-        LOG.debug(url)
-        if not self.Username:
-            req = requests.get(url)
-        else:
-            req = requests.get(url, auth=(self.Username, self.Password))
+        req = self.client.get(f"/subjects/{subject_name}/versions")
         if req.status_code == 200:
             return req.json()
         req.raise_for_status()
@@ -98,12 +78,7 @@ class SchemaRegistry(BaseModel):
 
         :raises: requests.exceptions.HTTPError
         """
-        url = f"{self.SchemaRegistryUrl}/subjects/{subject_name}/versions/{version_id}/schema"
-        LOG.debug(url)
-        if not self.Username:
-            req = requests.get(url)
-        else:
-            req = requests.get(url, auth=(self.Username, self.Password))
+        req = self.client.get(f"/subjects/{subject_name}/versions/{version_id}/schema")
         if req.status_code == 200:
             return req.json()
         req.raise_for_status()
@@ -115,12 +90,7 @@ class SchemaRegistry(BaseModel):
         :raises: requests.exceptions.HTTPError
         :return:
         """
-        url = f"{self.SchemaRegistryUrl}/schemas"
-        LOG.debug(url)
-        if not self.Username:
-            req = requests.get(url)
-        else:
-            req = requests.get(url, auth=(self.Username, self.Password))
+        req = self.client.get("/schemas")
         if req.status_code == 200:
             return req.json()
         req.raise_for_status()
@@ -134,16 +104,9 @@ class SchemaRegistry(BaseModel):
         :param int version_id:
         :return: the request
         """
-        url = f"{self.SchemaRegistryUrl}/subjects/{subject_name}/versions/{version_id}/referencedby"
-        LOG.debug(url)
-        if not self.Username:
-            req = requests.get(url, headers=self.default_headers)
-        else:
-            req = requests.get(
-                url,
-                headers=self.default_headers,
-                auth=(self.Username, self.Password),
-            )
+        req = self.client.get(
+            f"/subjects/{subject_name}/versions/{version_id}/referencedby"
+        )
         return req
 
     def get_subject_versions_referencedby(self, subject_name, version_id):
@@ -179,43 +142,28 @@ class SchemaRegistry(BaseModel):
             schema_type = Type[schema_type].value
 
         payload = {"schema": definition, "schemaType": schema_type}
-        url = f"{self.SchemaRegistryUrl}/subjects/{subject_name}"
-        LOG.debug(url)
-        if not self.Username:
-            req = requests.post(url, json=payload, headers=self.post_headers)
-        else:
-            req = requests.post(
-                url,
-                json=payload,
-                headers=self.post_headers,
-                auth=(self.Username, self.Password),
-            )
+        url = f"/subjects/{subject_name}"
+        req = self.client.post(url, json=payload)
+
         return req
 
     def post_subject_version_raw(self, subject_name, definition, schema_type=None):
-        exists_req = self.post_subject_schema(subject_name, definition, schema_type)
-        if exists_req.status_code == 200:
-            return exists_req
-        if isinstance(definition, dict):
-            definition = str(json.dumps(definition))
-        if schema_type is None:
-            schema_type = Type["AVRO"].value
-        else:
-            schema_type = Type[schema_type].value
+        try:
+            exists_req = self.post_subject_schema(subject_name, definition, schema_type)
+            if exists_req.status_code == 200:
+                return exists_req
+        except GenericNotFound:
+            if isinstance(definition, dict):
+                definition = str(json.dumps(definition))
+            if schema_type is None:
+                schema_type = Type["AVRO"].value
+            else:
+                schema_type = Type[schema_type].value
 
-        payload = {"schema": definition, "schemaType": schema_type}
-        url = f"{self.SchemaRegistryUrl}/subjects/{subject_name}/versions"
-        LOG.debug(url)
-        if not self.Username:
-            req = requests.post(url, json=payload, headers=self.post_headers)
-        else:
-            req = requests.post(
-                url,
-                json=payload,
-                headers=self.post_headers,
-                auth=(self.Username, self.Password),
-            )
-        return req
+            payload = {"schema": definition, "schemaType": schema_type}
+            url = f"/subjects/{subject_name}/versions"
+            req = self.client.post(url, json=payload)
+            return req
 
     def post_subject_version(
         self, subject_name, definition, schema_type=None, for_key=False
@@ -250,22 +198,13 @@ class SchemaRegistry(BaseModel):
         :param int version_id:
         :param bool permanent:
         """
-        url = f"{self.SchemaRegistryUrl}/subjects/{subject_name}"
+        url = f"/subjects/{subject_name}"
         if version_id:
             url = f"{url}/versions/{version_id}"
-        LOG.debug(url)
-        if self.Username:
-            req = requests.delete(url, auth=(self.Username, self.Password))
-            if permanent:
-                permanent_url = f"{url}?permanent=true"
-                req = requests.delete(
-                    permanent_url, auth=(self.Username, self.Password)
-                )
-        else:
-            req = requests.delete(url)
-            if permanent:
-                permanent_url = f"{url}?permanent=true"
-                req = requests.delete(permanent_url)
+        req = self.client.delete(url)
+        if permanent:
+            permanent_url = f"{url}?permanent=true"
+            req = self.client.delete(permanent_url)
         return req
 
     def delete_subject(
@@ -280,12 +219,8 @@ class SchemaRegistry(BaseModel):
         """
         Method to get the list of schema types and return the request object
         """
-        url = f"{self.SchemaRegistryUrl}/schemas/types"
-        LOG.debug(url)
-        if self.Username:
-            req = requests.get(url, auth=(self.Username, self.Password))
-        else:
-            req = requests.get(url)
+        url = f"/schemas/types"
+        req = self.client.get(url)
         return req
 
     def get_schema_types(self):
@@ -301,14 +236,9 @@ class SchemaRegistry(BaseModel):
         req.raise_for_status()
 
     def get_schema_from_id_raw(self, schema_id):
-        url = f"{self.SchemaRegistryUrl}/schemas/ids/{schema_id}"
+        url = f"/schemas/ids/{schema_id}"
         LOG.debug(url)
-        if self.Username:
-            req = requests.get(
-                url, headers=self.default_headers, auth=(self.Username, self.Password)
-            )
-        else:
-            req = requests.get(url, headers=self.default_headers)
+        req = self.client.get(url)
         return req
 
     def get_schema_from_id(self, schema_id):
@@ -330,14 +260,8 @@ class SchemaRegistry(BaseModel):
         :param schema_id:
         :return:
         """
-        url = f"{self.SchemaRegistryUrl}/schemas/ids/{schema_id}/versions"
-        LOG.debug(url)
-        if self.Username:
-            req = requests.get(
-                url, headers=self.default_headers, auth=(self.Username, self.Password)
-            )
-        else:
-            req = requests.get(url, headers=self.default_headers)
+        url = f"/schemas/ids/{schema_id}/versions"
+        req = self.client.get(url)
         return req
 
     def get_schema_versions_from_id(self, schema_id):
@@ -361,7 +285,7 @@ class SchemaRegistry(BaseModel):
         schema_type=None,
         references=None,
     ):
-        url = f"{self.SchemaRegistryUrl}/compatibility/subjects/{subject_name}/versions/{version_id}"
+        url = f"/compatibility/subjects/{subject_name}/versions/{version_id}"
         LOG.debug(url)
         if isinstance(definition, dict):
             definition = str(json.dumps(definition))
@@ -374,15 +298,7 @@ class SchemaRegistry(BaseModel):
         if references and isinstance(references, list):
             payload["references"] = references
 
-        if self.Username:
-            req = requests.post(
-                url,
-                headers=self.post_headers,
-                json=payload,
-                auth=(self.Username, self.Password),
-            )
-        else:
-            req = requests.post(url, headers=self.post_headers, json=payload)
+        req = self.client.post(url, json=payload)
         return req
 
     def post_compatibility_subjects_versions(
@@ -404,19 +320,9 @@ class SchemaRegistry(BaseModel):
         req.raise_for_status()
 
     def put_compatibility_subject_config_raw(self, subject_name, compatibility):
-        url = f"{self.SchemaRegistryUrl}/config/{subject_name}/"
-        LOG.debug(url)
-
+        url = f"/config/{subject_name}/"
         payload = {"compatibility": compatibility}
-        if self.Username:
-            req = requests.put(
-                url,
-                headers=self.post_headers,
-                json=payload,
-                auth=(self.Username, self.Password),
-            )
-        else:
-            req = requests.put(url, headers=self.post_headers, json=payload)
+        req = requests.put(url, headers=self.post_headers, json=payload)
         return req
 
     def put_compatibility_subject_config(self, subject_name, compatibility):
@@ -426,17 +332,8 @@ class SchemaRegistry(BaseModel):
         req.raise_for_status()
 
     def get_compatibility_subject_config_raw(self, subject_name):
-        url = f"{self.SchemaRegistryUrl}/config/{subject_name}/"
-        LOG.debug(url)
-
-        if self.Username:
-            req = requests.get(
-                url,
-                headers=self.default_headers,
-                auth=(self.Username, self.Password),
-            )
-        else:
-            req = requests.get(url, headers=self.default_headers)
+        url = f"/config/{subject_name}/"
+        req = requests.get(url)
         return req
 
     def get_compatibility_subject_config(self, subject_name):
