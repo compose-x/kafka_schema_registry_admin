@@ -5,7 +5,7 @@
 
 __author__ = """JohnPreston"""
 __email__ = "john@ews-network.net"
-__version__ = "0.2.6"
+__version__ = "0.3.0"
 
 from .kafka_schema_registry_admin import SchemaRegistry
 
