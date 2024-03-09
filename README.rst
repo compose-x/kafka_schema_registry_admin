@@ -2,15 +2,22 @@
 Kafka schema registry admin
 ===========================
 
-Pure HTTP client library (using requests) to manipulate schemas and definitions into Schema Registry"
+Simple / light HTTP client library (using requests) to manipulate schemas and definitions into Schema Registry.
 
-API specification is documented `here <https://docs.confluent.io/platform/current/schema-registry/develop/api.html#overview>`__
+* Confluent API specification is documented `here <https://docs.confluent.io/platform/current/schema-registry/develop/api.html#overview>`__
+
+* RedPanda API specification is documented `here <https://docs.redpanda.com/current/manage/schema-reg/schema-reg-api/>`__
 
 
-Credits
--------
+Usage
+======
 
-This package was created with Cookiecutter_ and the `audreyr/cookiecutter-pypackage`_ project template.
+Very simple example to manipulate the schema registry and its resources.
 
-.. _Cookiecutter: https://github.com/audreyr/cookiecutter
-.. _`audreyr/cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage
+.. code-block::
+
+    from kafka_schema_registry_admin import SchemaRegistry
+
+    registry = SchemaRegistry("http://localhost:8081")
+    subjects = registry.get_all_subjects()
+    schemas = registry.get_all_schemas()

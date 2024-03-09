@@ -4,7 +4,6 @@
 from copy import deepcopy
 
 import pytest
-from requests.exceptions import HTTPError
 
 from kafka_schema_registry_admin import SchemaRegistry
 from kafka_schema_registry_admin.client_wrapper.errors import (

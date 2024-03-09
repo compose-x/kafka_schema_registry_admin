@@ -77,6 +77,7 @@ services:
     image: conduktor/conduktor-console:1.21.1
     depends_on:
       - postgresql
+      - broker
     ports:
       - "8080:8080"
     volumes:
@@ -92,6 +93,8 @@ services:
     image: conduktor/conduktor-console-cortex:1.21.1
     environment:
       CDK_CONSOLE-URL: "http://conduktor-console:8080"
+    depends_on:
+      - conduktor-console
 volumes:
   pg_data: {}
   conduktor_data: {}
