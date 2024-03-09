@@ -1,20 +1,23 @@
-#   -*- coding: utf-8 -*-
 #  SPDX-License-Identifier: MPL-2.0
 #  Copyright 2020-2021 John Mille <john@ews-network.net>
 
-import pytest
-from requests.exceptions import HTTPError
 from copy import deepcopy
 
-from kafka_schema_registry_admin.kafka_schema_registry_admin import SchemaRegistry
+import pytest
+
+from kafka_schema_registry_admin import SchemaRegistry
+from kafka_schema_registry_admin.client_wrapper.errors import (
+    GenericNotFound,
+    IncompatibleSchema,
+)
 
 
 @pytest.fixture()
 def local_registry():
     return {
         "SchemaRegistryUrl": "http://localhost:8081",
-        "Username": "confluent",
-        "Password": "confluent",
+        # "Username": "confluent",
+        # "Password": "confluent",
     }
 
 
@@ -75,7 +78,7 @@ def test_register_new_definition_updated(local_registry, schema_sample):
     assert isinstance(compat, bool)
     if compat:
         r = s.post_subject_version("test-subject4", new_version, "AVRO")
-    with pytest.raises(HTTPError):
+    with pytest.raises(IncompatibleSchema):
         new_version["fields"].append({"type": "string", "name": "surname"})
         r = s.post_subject_version("test-subject4", new_version, "AVRO")
 
@@ -102,6 +105,6 @@ def test_delete_subject(local_registry):
 
 
 def test_error_delete_subject(local_registry):
-    with pytest.raises(HTTPError):
+    with pytest.raises(GenericNotFound):
         s = SchemaRegistry(**local_registry)
         s.delete_subject("test-subject4", permanent=True)
