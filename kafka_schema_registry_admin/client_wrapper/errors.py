@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import functools
 from typing import TYPE_CHECKING, Any
 
 from requests import exceptions as req_exceptions
@@ -29,34 +30,9 @@ class ApiGenericException(Exception):
         self.details = details
 
 
-class GenericNotFound(ApiGenericException):
+class ConflictException(ApiGenericException):
     """
-    Generic option for 404 return code
-    """
-
-    def __init__(self, code, details):
-        if isinstance(details[0], str):
-            super().__init__(details[0], code, details[1:])
-        else:
-            super().__init__(details, code, details[1:])
-
-
-class IncompatibleSchema(ApiGenericException):
-    """
-    Generic option for 409 return code and message starting
-    with "Schema being registered is incompatible with an earlier schema for subject"
-    """
-
-    def __init__(self, code, details):
-        if isinstance(details[0], str):
-            super().__init__(details[0], code, details[1:])
-        else:
-            super().__init__(details, code, details[1:])
-
-
-class GenericConflict(ApiGenericException):
-    """
-    Generic option for 409 return code
+    Exception class for 409 Conflict
     """
 
     def __init__(self, code, details):
@@ -73,28 +49,40 @@ class GenericConflict(ApiGenericException):
             super().__init__(details, code, details[1:])
 
 
-class GenericUnauthorized(ApiGenericException):
+class IncompatibleSchema(ApiGenericException):
     """
-    Generic option for 401 return code
-    """
-
-    def __init__(self, code, details):
-        if isinstance(details[0], str):
-            super().__init__(details[0], code, details[1:])
-        else:
-            super().__init__(details, code, details[1:])
-
-
-class GenericForbidden(ApiGenericException):
-    """
-    Generic exception for a 403
+    Exception class for 409
     """
 
     def __init__(self, code, details):
-        if isinstance(details[0], str):
-            super().__init__(details[0], code, details[1:])
-        else:
-            super().__init__(details, code, details[1:])
+        super().__init__("Incompatible Schema", code, details)
+
+
+class NotFoundException(ApiGenericException):
+    """
+    Exception class for 404 Not Found
+    """
+
+    def __init__(self, code, details):
+        super().__init__("Not Found", code, details)
+
+
+class UnauthorizedException(ApiGenericException):
+    """
+    Exception class for 401 Unauthorized
+    """
+
+    def __init__(self, code, details):
+        super().__init__("Unauthorized", code, details)
+
+
+class ForbiddenException(ApiGenericException):
+    """
+    Exception class for 403 Forbidden
+    """
+
+    def __init__(self, code, details):
+        super().__init__("Forbidden", code, details)
 
 
 class SchemaRegistryApiException(ApiGenericException):
@@ -102,30 +90,22 @@ class SchemaRegistryApiException(ApiGenericException):
     Top class for DatabaseUser exceptions
     """
 
-    def __init__(self, code, details):
-        if code == 409:
-            raise GenericConflict(code, details)
-        elif code == 404:
-            raise GenericNotFound(code, details)
-        elif code == 401:
-            raise GenericUnauthorized(code, details)
-        elif code == 403:
-            raise GenericForbidden(code, details)
-        elif code == 409:
-            raise GenericConflict(code, details)
+    EXCEPTION_CLASSES = {
+        409: ConflictException,
+        404: NotFoundException,
+        401: UnauthorizedException,
+        403: ForbiddenException,
+    }
 
-        super().__init__(details[0], code, details[1])
+    def __init__(self, code, details):
+        exception_class = self.EXCEPTION_CLASSES.get(code, ApiGenericException)
+        super().__init__("Api Error", code, details)
+        self.exception_instance = exception_class(code, details)
 
 
 def evaluate_api_return(function):
-    """
-    Decorator to evaluate the requests payload returned
-    """
-
+    @functools.wraps(function)
     def wrapped_answer(*args, **kwargs):
-        """
-        Decorator wrapper
-        """
         try:
             payload = function(*args, **kwargs)
             if payload.status_code not in [200, 201, 202, 204] and not keyisset(
@@ -135,7 +115,10 @@ def evaluate_api_return(function):
                     details = (args[0:2], payload.json())
                 except req_exceptions.JSONDecodeError:
                     details = (args[0:2], payload.text)
-                raise SchemaRegistryApiException(payload.status_code, details)
+                schema_exception = SchemaRegistryApiException(
+                    payload.status_code, details
+                )
+                raise schema_exception.exception_instance
 
             elif keyisset("ignore_failure", kwargs):
                 return payload

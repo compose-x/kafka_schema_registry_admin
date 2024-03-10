@@ -7,6 +7,11 @@ Main module for schema_registry_admin
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from requests import Response
+
 import json
 from enum import Enum
 from logging import getLogger
@@ -16,7 +21,7 @@ import requests
 from pydantic import AnyUrl, BaseModel, Field
 
 from .client_wrapper import Client
-from .client_wrapper.errors import GenericNotFound
+from .client_wrapper.errors import NotFoundException, SchemaRegistryApiException
 
 LOG = getLogger()
 LOG.setLevel("WARN")
@@ -28,24 +33,17 @@ class Type(Enum):
     PROTOBUFF = "PROTOBUF"
 
 
-class SchemaRegistry(BaseModel):
-    SchemaRegistryUrl: Optional[AnyUrl] = Field(
-        None,
-        description="Endpoint URL of the Schema Registry",
-    )
-    Username: Optional[str] = Field("", description="Username for Authentication")
-    Password: Optional[str] = Field("", description="Password for Authentication")
-    client: Optional[Any] = None
+class SchemaRegistry:
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        if (self.Username and not self.Password) or (
-            self.Password and not self.Username
-        ):
-            raise KeyError(
-                "When specifying credentials, you must specify both Username and Password"
-            )
-        self.client: Client = Client(str(self.SchemaRegistryUrl))
+    def __init__(self, base_url: str, *args, **kwargs):
+        self.client: Client = Client(str(base_url))
+
+    @property
+    def subjects(self) -> list[str]:
+        """
+        Property to get the list of subjects in the schema registry
+        """
+        return self.get_all_subjects()
 
     def get_all_subjects(self):
         """
@@ -83,18 +81,6 @@ class SchemaRegistry(BaseModel):
             return req.json()
         req.raise_for_status()
 
-    def get_all_schemas(self):
-        """
-        Method to get all the schemas in the schema registry
-
-        :raises: requests.exceptions.HTTPError
-        :return:
-        """
-        req = self.client.get("/schemas")
-        if req.status_code == 200:
-            return req.json()
-        req.raise_for_status()
-
     def get_subject_versions_referencedby_raw(self, subject_name, version_id):
         """
         https://docs.confluent.io/platform/current/schema-registry/develop/api.html
@@ -124,16 +110,10 @@ class SchemaRegistry(BaseModel):
             return req.json()
         req.raise_for_status()
 
-    def post_subject_schema(self, subject_name, definition, schema_type=None):
-        """
-        Method that returns the schema ID and details if already exists, from the schema definition
-
-        :param str subject_name:
-        :param definition:
-        :param schema_type:
-        :return:
-        :raises: requests.exceptions
-        """
+    def post_subject_schema(
+        self, subject_name, definition, schema_type=None
+    ) -> Response:
+        """Returns the schema ID and details if already exists, from the schema definition"""
         if isinstance(definition, dict):
             definition = str(json.dumps(definition))
         if schema_type is None:
@@ -147,12 +127,12 @@ class SchemaRegistry(BaseModel):
 
         return req
 
-    def post_subject_version_raw(self, subject_name, definition, schema_type=None):
+    def post_subject_schema_version(
+        self, subject_name, definition, schema_type=None
+    ) -> Response:
         try:
-            exists_req = self.post_subject_schema(subject_name, definition, schema_type)
-            if exists_req.status_code == 200:
-                return exists_req
-        except GenericNotFound:
+            return self.post_subject_schema(subject_name, definition, schema_type)
+        except NotFoundException:
             if isinstance(definition, dict):
                 definition = str(json.dumps(definition))
             if schema_type is None:
@@ -162,32 +142,12 @@ class SchemaRegistry(BaseModel):
 
             payload = {"schema": definition, "schemaType": schema_type}
             url = f"/subjects/{subject_name}/versions"
-            req = self.client.post(url, json=payload)
-            return req
-
-    def post_subject_version(
-        self, subject_name, definition, schema_type=None, for_key=False
-    ):
-        req = self.post_subject_version_raw(subject_name, definition, schema_type)
-        if req.status_code == 200:
-            return req.json()
-        req.raise_for_status()
-
-    def post_subject_schema_version(self, subject_name, definition, schema_type=None):
-        """
-        Method to return the object response. Raise if not 200
-
-        :param str subject_name:
-        :param definition:
-        :param str schema_type:
-        :return: the content of the reply
-        :rtype: dict
-        :raises: requests.exceptions
-        """
-        req = self.post_subject_version_raw(subject_name, definition, schema_type)
-        if req.status_code == 200:
-            return req.json()
-        req.raise_for_status()
+            try:
+                req = self.client.post(url, json=payload)
+                return req
+            except Exception as error_create:
+                print("ERROR CREATE", error_create)
+                raise
 
     def delete_subject_raw(self, subject_name, version_id=None, permanent=False):
         """

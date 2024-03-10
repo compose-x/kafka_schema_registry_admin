@@ -12,7 +12,7 @@ from urllib.parse import urlparse
 
 import requests
 
-from .errors import evaluate_api_return
+from .errors import ApiGenericException, SchemaRegistryApiException, evaluate_api_return
 
 
 class Client:
@@ -50,6 +50,7 @@ class Client:
         headers.update(self._default_headers)
         headers.update(self._post_headers)
         url: str = urlparse(self._base_url + api_path).geturl()
+        print("URL??", url)
         response = requests.post(url, *args, **kwargs)
         return response
 
