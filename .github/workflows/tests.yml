@@ -17,4 +17,5 @@ jobs:
         python -m pip install pip -U; python -m pip install poetry; poetry install
     - name: Run tests
       run: |
-        pytest -svx
+        coverage run --source kafka_schema_registry_admin -m pytest
+        coverage report -m

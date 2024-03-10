@@ -15,13 +15,11 @@ if TYPE_CHECKING:
 import json
 from enum import Enum
 from logging import getLogger
-from typing import Any, Optional
 
 import requests
-from pydantic import AnyUrl, BaseModel, Field
 
 from .client_wrapper import Client
-from .client_wrapper.errors import NotFoundException, SchemaRegistryApiException
+from .client_wrapper.errors import NotFoundException
 
 LOG = getLogger()
 LOG.setLevel("WARN")
@@ -36,52 +34,42 @@ class Type(Enum):
 class SchemaRegistry:
 
     def __init__(self, base_url: str, *args, **kwargs):
-        self.client: Client = Client(str(base_url))
+        username = kwargs.get("basic_auth.username", None)
+        password = kwargs.get("basic_auth.password", None)
+        basic_auth: dict = {}
+        if username and password:
+            basic_auth: dict = {
+                "basic_auth.username": username,
+                "basic_auth.password": password,
+            }
+        self.client: Client = Client(str(base_url), basic_auth)
 
     @property
     def subjects(self) -> list[str]:
         """
         Property to get the list of subjects in the schema registry
         """
-        return self.get_all_subjects()
+        return self.get_all_subjects().json()
 
-    def get_all_subjects(self):
+    def get_all_subjects(self) -> Response:
         """
         Method to get the list of subjects in the schema registry
         https://docs.confluent.io/platform/current/schema-registry/develop/api.html#get--subjects
 
         :raises: requests.exceptions.HTTPError
         """
-        req = self.client.get("/subjects")
-        if req.status_code == 200:
-            return req.json()
-        req.raise_for_status()
+        return self.client.get("/subjects")
 
-    def get_subject_versions(self, subject_name: str):
+    def get_subject_versions(self, subject_name: str) -> Response:
         """
         Method to get the list of subjects in the schema registry
         https://docs.confluent.io/platform/current/schema-registry/develop/api.html#get--subjects-(string-%20subject)-versions
 
         :raises: requests.exceptions.HTTPError
         """
-        req = self.client.get(f"/subjects/{subject_name}/versions")
-        if req.status_code == 200:
-            return req.json()
-        req.raise_for_status()
+        return self.client.get(f"/subjects/{subject_name}/versions")
 
-    def get_subject_versions_schema(self, subject_name: str, version_id: int):
-        """
-        Method to get the schema of a subject in a specific version
-        https://docs.confluent.io/platform/current/schema-registry/develop/api.html#get--subjects-(string-%20subject)-versions-(versionId-%20version)-schema
-
-        :raises: requests.exceptions.HTTPError
-        """
-        req = self.client.get(f"/subjects/{subject_name}/versions/{version_id}/schema")
-        if req.status_code == 200:
-            return req.json()
-        req.raise_for_status()
-
-    def get_subject_versions_referencedby_raw(self, subject_name, version_id):
+    def get_subject_versions_referencedby(self, subject_name, version_id) -> Response:
         """
         https://docs.confluent.io/platform/current/schema-registry/develop/api.html
         #get--subjects-(string-%20subject)-versions-versionId-%20version-referencedby
@@ -94,21 +82,6 @@ class SchemaRegistry:
             f"/subjects/{subject_name}/versions/{version_id}/referencedby"
         )
         return req
-
-    def get_subject_versions_referencedby(self, subject_name, version_id):
-        """
-        https://docs.confluent.io/platform/current/schema-registry/develop/api.html
-        #get--subjects-(string-%20subject)-versions-versionId-%20version-referencedby
-
-        :param str subject_name:
-        :param int version_id:
-        :return:
-        :raises: requests.exceptions.HTTPError
-        """
-        req = self.get_subject_versions_referencedby_raw(subject_name, version_id)
-        if req.status_code == 200:
-            return req.json()
-        req.raise_for_status()
 
     def post_subject_schema(
         self, subject_name, definition, schema_type=None
@@ -149,7 +122,9 @@ class SchemaRegistry:
                 print("ERROR CREATE", error_create)
                 raise
 
-    def delete_subject_raw(self, subject_name, version_id=None, permanent=False):
+    def delete_subject(
+        self, subject_name, version_id=None, permanent=False
+    ) -> Response:
         """
         Method to delete a subject via its ID
         https://docs.confluent.io/platform/current/schema-registry/develop/api.html#delete--subjects-(string-%20subject)
@@ -167,15 +142,7 @@ class SchemaRegistry:
             req = self.client.delete(permanent_url)
         return req
 
-    def delete_subject(
-        self, subject_name, version_id=None, permanent=False, for_key=False
-    ):
-        req = self.delete_subject_raw(subject_name, version_id, permanent)
-        if req.status_code == 200:
-            return req.json()
-        req.raise_for_status()
-
-    def get_schema_types_raw(self):
+    def get_schema_types(self) -> Response:
         """
         Method to get the list of schema types and return the request object
         """
@@ -183,68 +150,28 @@ class SchemaRegistry:
         req = self.client.get(url)
         return req
 
-    def get_schema_types(self):
-        """
-        Method to retrieve the supported schema types by the schema registry
-
-        :return: list of schema types
-        :rtype: list<str>
-        """
-        req = self.get_schema_types_raw()
-        if req.status_code == 200:
-            return req.json()
-        req.raise_for_status()
-
-    def get_schema_from_id_raw(self, schema_id):
+    def get_schema_from_id(self, schema_id) -> Response:
         url = f"/schemas/ids/{schema_id}"
         LOG.debug(url)
         req = self.client.get(url)
         return req
 
-    def get_schema_from_id(self, schema_id):
+    def get_schema_versions_from_id(self, schema_id):
         """
-        Method to return the object return from the request
-
-        :param int schema_id:
-        :return:
-        """
-        req = self.get_schema_from_id_raw(schema_id)
-        if req.status_code == 200:
-            return req.json()
-        req.raise_for_status()
-
-    def get_schema_versions_from_id_raw(self, schema_id):
-        """
-        Method to retrieve the versions for a given schema by its ID
-
-        :param schema_id:
-        :return:
+        Retrieve the versions for a given schema by its ID
         """
         url = f"/schemas/ids/{schema_id}/versions"
         req = self.client.get(url)
         return req
 
-    def get_schema_versions_from_id(self, schema_id):
-        """
-        Method to get the content response as dict
-
-        :param int schema_id:
-        :return: the object
-        :rtype: dict
-        """
-        req = self.get_schema_versions_from_id_raw(schema_id)
-        if req.status_code == 200:
-            return req.json()
-        req.raise_for_status()
-
-    def post_compatibility_subjects_versions_raw(
+    def post_compatibility_subjects_versions(
         self,
         subject_name,
         version_id,
         definition,
         schema_type=None,
         references=None,
-    ):
+    ) -> Response:
         url = f"/compatibility/subjects/{subject_name}/versions/{version_id}"
         LOG.debug(url)
         if isinstance(definition, dict):
@@ -261,43 +188,13 @@ class SchemaRegistry:
         req = self.client.post(url, json=payload)
         return req
 
-    def post_compatibility_subjects_versions(
-        self,
-        subject_name,
-        version_id,
-        definition,
-        definition_type=None,
-        references=None,
-        as_bool=False,
-    ):
-        req = self.post_compatibility_subjects_versions_raw(
-            subject_name, version_id, definition, definition_type, references
-        )
-        if req.status_code == 200:
-            if as_bool:
-                return req.json()["is_compatible"]
-            return req
-        req.raise_for_status()
+    def get_compatibility_subject_config(self, subject_name) -> Response:
+        url = f"/config/{subject_name}/"
+        req = self.client.get(url)
+        return req
 
-    def put_compatibility_subject_config_raw(self, subject_name, compatibility):
+    def put_compatibility_subject_config(self, subject_name, compatibility) -> Response:
         url = f"/config/{subject_name}/"
         payload = {"compatibility": compatibility}
-        req = requests.put(url, headers=self.post_headers, json=payload)
+        req = self.client.put(url, json=payload)
         return req
-
-    def put_compatibility_subject_config(self, subject_name, compatibility):
-        req = self.put_compatibility_subject_config_raw(subject_name, compatibility)
-        if req.status_code == 200:
-            return req
-        req.raise_for_status()
-
-    def get_compatibility_subject_config_raw(self, subject_name):
-        url = f"/config/{subject_name}/"
-        req = requests.get(url)
-        return req
-
-    def get_compatibility_subject_config(self, subject_name):
-        req = self.get_compatibility_subject_config_raw(subject_name)
-        if req.status_code == 200:
-            return req.json()["compatibility"]
-        req.raise_for_status()

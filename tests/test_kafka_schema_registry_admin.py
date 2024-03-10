@@ -27,7 +27,16 @@ SR_PORT = int(compose.get_service_port("schema-registry", 8081))
 
 
 @pytest.fixture()
+def authed_local_registry():
+    return SchemaRegistry(
+        f"http://localhost:{SR_PORT}",
+        **{"basic_auth.username": "confluent", "basic_auth.password": "confluent"},
+    )
+
+
+@pytest.fixture()
 def local_registry():
+
     return SchemaRegistry(f"http://localhost:{SR_PORT}")
 
 
@@ -58,22 +67,22 @@ def schema_sample():
     }
 
 
-def test_register_new_definition(local_registry, schema_sample):
-    c = local_registry.post_subject_schema_version(
-        "test-subject4", schema_sample, "AVRO"
+def test_register_new_definition(authed_local_registry, schema_sample):
+    c = authed_local_registry.post_subject_schema_version(
+        "test-subject4", schema_sample
     )
-    r = local_registry.get_schema_from_id(c.json()["id"])
+    r = authed_local_registry.get_schema_from_id(c.json()["id"])
+    assert "test-subject4" in authed_local_registry.subjects
 
 
 def test_subject_existing_schema_definition(local_registry, schema_sample):
     r = local_registry.post_subject_schema("test-subject4", schema_sample, "AVRO")
-    print(r)
+    r = local_registry.get_schema_versions_from_id(r.json()["id"])
 
 
 def test_register_new_definition_updated(local_registry, schema_sample):
     new_version = deepcopy(schema_sample)
-    test = local_registry.post_subject_schema_version("test-subject4", schema_sample)
-    print(test.json())
+    test = local_registry.post_subject_schema("test-subject4", schema_sample)
     latest = local_registry.get_subject_versions_referencedby(
         "test-subject4", test.json()["version"]
     )
@@ -84,11 +93,18 @@ def test_register_new_definition_updated(local_registry, schema_sample):
             "type": "string",
         }
     )
+    with pytest.raises(NotFoundException):
+        local_registry.get_compatibility_subject_config("test-subject4")
+    local_registry.put_compatibility_subject_config("test-subject4", "BACKWARD")
     compat = local_registry.post_compatibility_subjects_versions(
-        "test-subject4", test.json()["version"], new_version, "AVRO", as_bool=True
+        "test-subject4",
+        test.json()["version"],
+        new_version,
+        "AVRO",
     )
-    assert isinstance(compat, bool)
-    if compat:
+    assert isinstance(compat.json()["is_compatible"], bool)
+    is_compatible = compat.json()["is_compatible"]
+    if is_compatible:
         r = local_registry.post_subject_schema_version(
             "test-subject4", new_version, "AVRO"
         )
@@ -97,15 +113,21 @@ def test_register_new_definition_updated(local_registry, schema_sample):
         r = local_registry.post_subject_schema_version(
             "test-subject4", new_version, "AVRO"
         )
+    local_registry.put_compatibility_subject_config("test-subject4", "FORWARD")
+    new_version["fields"].pop(0)
+    with pytest.raises(IncompatibleSchema):
+        r = local_registry.post_subject_schema_version(
+            "test-subject4", new_version, "AVRO"
+        )
 
 
 def test_get_all_subjects(local_registry):
-    r = local_registry.get_all_subjects()
+    r = local_registry.get_all_subjects().json()
     assert isinstance(r, list) and r
 
 
 def test_get_all_schema_types(local_registry):
-    r = local_registry.get_schema_types()
+    r = local_registry.get_schema_types().json()
     assert isinstance(r, list) and r
 
 

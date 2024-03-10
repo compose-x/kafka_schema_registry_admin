@@ -18,7 +18,7 @@ from .errors import ApiGenericException, SchemaRegistryApiException, evaluate_ap
 class Client:
     """API Client wrapper around the requests"""
 
-    def __init__(self, base_url: str):
+    def __init__(self, base_url: str, basic_auth: dict = None):
         self._base_url = base_url
 
         self._default_headers: dict = {
@@ -28,6 +28,12 @@ class Client:
             "Accept": "application/json",
             "Content-Type": "application/vnd.schemaregistry.v1+json",
         }
+        self.auth = None
+        if basic_auth:
+            self.auth = (
+                basic_auth["basic_auth.username"],
+                basic_auth["basic_auth.password"],
+            )
 
     @evaluate_api_return
     def get(self, api_path: str, *args, **kwargs) -> Response:
@@ -38,7 +44,7 @@ class Client:
         headers.update(self._default_headers)
         url: str = urlparse(self._base_url + api_path).geturl()
 
-        response = requests.get(url, *args, **kwargs)
+        response = requests.get(url, auth=self.auth, *args, **kwargs)
         return response
 
     @evaluate_api_return
@@ -50,8 +56,7 @@ class Client:
         headers.update(self._default_headers)
         headers.update(self._post_headers)
         url: str = urlparse(self._base_url + api_path).geturl()
-        print("URL??", url)
-        response = requests.post(url, *args, **kwargs)
+        response = requests.post(url, auth=self.auth, *args, **kwargs)
         return response
 
     @evaluate_api_return
@@ -63,7 +68,7 @@ class Client:
         headers.update(self._default_headers)
         url: str = urlparse(self._base_url + api_path).geturl()
 
-        response = requests.put(url, *args, **kwargs)
+        response = requests.put(url, auth=self.auth, *args, **kwargs)
         return response
 
     @evaluate_api_return
@@ -75,5 +80,5 @@ class Client:
         headers.update(self._default_headers)
 
         url: str = urlparse(self._base_url + api_path).geturl()
-        response = requests.delete(url, *args, **kwargs)
+        response = requests.delete(url, auth=self.auth, *args, **kwargs)
         return response
