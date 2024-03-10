@@ -1,9 +1,7 @@
 #  SPDX-License-Identifier: Apache License 2.0
 #  Copyright 2020-2021 John Mille <john@ews-network.net>
 
-import sys
 from copy import deepcopy
-from datetime import datetime
 from os import path
 
 import pytest
@@ -24,7 +22,6 @@ compose = DockerCompose(
     pull=True,
 )
 compose.start()
-# sleep(5)
 
 SR_PORT = int(compose.get_service_port("schema-registry", 8081))
 BASE_URL = f"http://localhost:{SR_PORT}"
