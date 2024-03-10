@@ -36,7 +36,6 @@ class ConflictException(ApiGenericException):
     """
 
     def __init__(self, code, details):
-        print(details[-1], type(details[-1]))
         if isinstance(details[0], str):
             super().__init__(details[0], code, details[1:])
         else:

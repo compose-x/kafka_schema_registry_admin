@@ -12,6 +12,6 @@ compose = DockerCompose(
 
 
 def pytest_sessionfinish(session, exitstatus):
-    compose.stop()
+    # compose.stop()
     print("Testing session has finished")
     print(f"Exit status: {exitstatus}")
