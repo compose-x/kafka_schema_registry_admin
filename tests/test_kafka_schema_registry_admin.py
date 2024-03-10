@@ -18,18 +18,24 @@ from kafka_schema_registry_admin.client_wrapper.errors import (
 HERE = path.abspath(path.dirname(__file__))
 
 compose = DockerCompose(
-    path.abspath(f"{HERE}/.."), compose_file_name="docker-compose.yaml", wait=True
+    path.abspath(f"{HERE}/.."),
+    compose_file_name="docker-compose.yaml",
+    wait=True,
+    pull=True,
 )
 compose.start()
 sleep(5)
 
 SR_PORT = int(compose.get_service_port("schema-registry", 8081))
+BASE_URL = f"http://localhost:{SR_PORT}"
+
+print(f"BASE URL FOR TESTS: {BASE_URL}")
 
 
 @pytest.fixture()
 def authed_local_registry():
     return SchemaRegistry(
-        f"http://localhost:{SR_PORT}",
+        BASE_URL,
         **{"basic_auth.username": "confluent", "basic_auth.password": "confluent"},
     )
 
