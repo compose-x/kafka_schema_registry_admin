@@ -64,3 +64,13 @@ src = "pyproject.toml"
 [[tool.tbump.before_commit]]
 name = "Files format"
 cmd = "make conform"
+
+[tool.coverage.report]
+exclude_lines = [
+  "if __name__ == '__main__'",
+    "pragma: no cover",
+    "if TYPE_CHECKING:"
+]
+
+[tool.coverage.run]
+relative_files = true
