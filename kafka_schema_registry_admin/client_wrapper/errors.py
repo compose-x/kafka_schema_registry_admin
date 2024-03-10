@@ -44,8 +44,9 @@ class ConflictException(ApiGenericException):
                 if error_message.startswith(
                     "Schema being registered is incompatible with an earlier schema for subject"
                 ):
-                    raise IncompatibleSchema(code, details)
-            super().__init__(details, code, details[1:])
+                    raise IncompatibleSchema(code, details[1:])
+            else:
+                super().__init__(details, code, details[1:])
 
 
 class IncompatibleSchema(ApiGenericException):
@@ -84,6 +85,16 @@ class ForbiddenException(ApiGenericException):
         super().__init__("Forbidden", code, details)
 
 
+class UnprocessableEntity(ApiGenericException):
+    def __init__(self, code, details):
+        super().__init__("Unprocessable Entity", code, details)
+
+
+class UnexpectedException(ApiGenericException):
+    def __init__(self, code, details):
+        super().__init__("Unexpected Error", code, details)
+
+
 class SchemaRegistryApiException(ApiGenericException):
     """
     Top class for DatabaseUser exceptions
@@ -94,11 +105,18 @@ class SchemaRegistryApiException(ApiGenericException):
         404: NotFoundException,
         401: UnauthorizedException,
         403: ForbiddenException,
+        422: UnprocessableEntity,
     }
 
     def __init__(self, code, details):
-        exception_class = self.EXCEPTION_CLASSES.get(code, ApiGenericException)
-        super().__init__("Api Error", code, details)
+        exception_class = self.EXCEPTION_CLASSES.get(code, UnexpectedException)
+        super().__init__(
+            details[0] is isinstance(details[0], str)
+            and details[0]
+            or "SchemaRegistry Api Error",
+            code,
+            details,
+        )
         self.exception_instance = exception_class(code, details)
 
 

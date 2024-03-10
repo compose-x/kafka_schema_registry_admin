@@ -2,45 +2,13 @@
 #  Copyright 2020-2021 John Mille <john@ews-network.net>
 import json
 from copy import deepcopy
-from os import path
 
 import pytest
-from testcontainers.compose import DockerCompose
 
-from kafka_schema_registry_admin import SchemaRegistry
 from kafka_schema_registry_admin.client_wrapper.errors import (
     IncompatibleSchema,
     NotFoundException,
 )
-
-HERE = path.abspath(path.dirname(__file__))
-
-compose = DockerCompose(
-    path.abspath(f"{HERE}/.."),
-    compose_file_name="docker-compose.yaml",
-    wait=True,
-    pull=True,
-)
-compose.start()
-
-SR_PORT = int(compose.get_service_port("schema-registry", 8081))
-BASE_URL = f"http://localhost:{SR_PORT}"
-print(f"BASE URL FOR TESTS: {BASE_URL}")
-compose.wait_for(f"{BASE_URL}/subjects")
-
-
-@pytest.fixture()
-def authed_local_registry():
-    return SchemaRegistry(
-        BASE_URL,
-        **{"basic_auth.username": "confluent", "basic_auth.password": "confluent"},
-    )
-
-
-@pytest.fixture()
-def local_registry():
-
-    return SchemaRegistry(f"http://localhost:{SR_PORT}")
 
 
 @pytest.fixture()
@@ -68,6 +36,10 @@ def schema_sample():
             },
         ],
     }
+
+
+def test_reset_sr_mode(local_registry):
+    local_registry.put_mode("READWRITE")
 
 
 def test_register_new_definition(authed_local_registry, schema_sample):
@@ -113,7 +85,6 @@ def test_register_new_definition_updated(local_registry, schema_sample):
         test.json()["version"],
         new_version,
         verbose=True,
-        schema_type="AVRO",
     )
     assert isinstance(compat.json()["is_compatible"], bool)
     is_compatible = compat.json()["is_compatible"]

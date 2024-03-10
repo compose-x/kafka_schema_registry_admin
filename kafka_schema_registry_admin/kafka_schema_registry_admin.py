@@ -30,6 +30,22 @@ class Type(Enum):
     PROTOBUFF = "PROTOBUF"
 
 
+class RegistryMode(Enum):
+    IMPORT = "IMPORT"
+    READONLY = "READONLY"
+    READWRITE = "READWRITE"
+
+
+class CompatibilityMode(Enum):
+    BACKWARD = "BACKWARD"
+    BACKWARD_TRANSITIVE = "BACKWARD_TRANSITIVE"
+    FORWARD = "FORWARD"
+    FORWARD_TRANSITIVE = "FORWARD_TRANSITIVE"
+    FULL = "FULL"
+    FULL_TRANSITIVE = "FULL_TRANSITIVE"
+    NONE = "NONE"
+
+
 class SchemaRegistry:
 
     def __init__(self, base_url: str, *args, **kwargs):
@@ -133,7 +149,13 @@ class SchemaRegistry:
         return req
 
     def post_subject_schema_version(
-        self, subject_name, definition, normalize: bool = False, schema_type=None
+        self,
+        subject_name,
+        definition,
+        normalize: bool = False,
+        schema_type=None,
+        version_id: int = None,
+        schema_id: int = None,
     ) -> Response:
         """
         `API Doc <https://docs.confluent.io/platform/current/schema-registry/develop/api.html#post--subjects-(string-%20subject)-versions>`__
@@ -154,6 +176,11 @@ class SchemaRegistry:
             url = f"/subjects/{subject_name}/versions"
             if normalize:
                 url = f"{url}?normalize=true"
+            """When trying to do recovery, SR must be in import mode either globally or for the subject itself."""
+            if version_id and schema_id:
+                payload["version"] = version_id
+                payload["id"] = schema_id
+
             req = self.client.post(url, json=payload)
             return req
 
@@ -215,9 +242,10 @@ class SchemaRegistry:
         references: list = None,
     ) -> Response:
         url = f"/compatibility/subjects/{subject_name}/versions"
-        return self.validate_subject_compatibility(
+        payload = self.set_subject_validity_payload(
             url, definition, schema_type, verbose=verbose, references=references
         )
+        return self.client.post(url, json=payload)
 
     def post_compatibility_subject_version_id(
         self,
@@ -229,18 +257,19 @@ class SchemaRegistry:
         references: list = None,
     ) -> Response:
         url = f"/compatibility/subjects/{subject_name}/versions/{version_id}"
-        return self.validate_subject_compatibility(
+        payload = self.set_subject_validity_payload(
             url, definition, schema_type, verbose=verbose, references=references
         )
+        return self.client.post(url, json=payload)
 
-    def validate_subject_compatibility(
-        self,
+    @staticmethod
+    def set_subject_validity_payload(
         url: str,
         definition,
         schema_type,
         verbose: bool = False,
         references: list = None,
-    ) -> Response:
+    ) -> dict:
         if verbose:
             url = f"{url}?verbose=true"
         LOG.debug(url)
@@ -254,9 +283,7 @@ class SchemaRegistry:
         payload = {"schema": definition, "schemaType": schema_type}
         if references and isinstance(references, list):
             payload["references"] = references
-
-        req = self.client.post(url, json=payload)
-        return req
+        return payload
 
     def get_compatibility_subject_config(self, subject_name) -> Response:
         url = f"/config/{subject_name}/"
@@ -267,4 +294,131 @@ class SchemaRegistry:
         url = f"/config/{subject_name}/"
         payload = {"compatibility": compatibility}
         req = self.client.put(url, json=payload)
+        return req
+
+    def get_mode(self, as_str: bool = False) -> Response | str:
+        """
+        `API Doc <https://docs.confluent.io/platform/current/schema-registry/develop/api.html#mode>`__
+        """
+        url_path: str = "/mode"
+        req = self.client.get(url_path)
+        if as_str:
+            return RegistryMode[req.json().get("mode")].value
+        return req
+
+    def put_mode(self, mode: str | RegistryMode, force: bool = False) -> Response:
+        """
+        `API Doc <https://docs.confluent.io/platform/current/schema-registry/develop/api.html#put--mode>`__
+        """
+        url_path: str = "/mode"
+        if force:
+            url_path += "?force=true"
+        req = self.client.put(url_path, json={"mode": mode})
+        return req
+
+    def get_subject_mode(self, subject_name: str) -> Response:
+        """
+        `API Doc <https://docs.confluent.io/platform/current/schema-registry/develop/api.html#get--mode-(string-%20subject)>`__
+        """
+        url_path: str = f"/mode/{subject_name}"
+        req = self.client.get(url_path)
+        return req
+
+    def put_subject_mode(
+        self, subject_name: str, mode: str | RegistryMode, force: bool = False
+    ) -> Response:
+        """
+        `API Doc <https://docs.confluent.io/platform/current/schema-registry/develop/api.html#put--mode-(string-%20subject)>`__
+        """
+        url_path: str = f"/mode/{subject_name}"
+        if force:
+            url_path += "?force=true"
+        req = self.client.put(url_path, json={"mode": mode})
+        return req
+
+    def get_config(self):
+        """
+        `API Doc <https://docs.confluent.io/platform/current/schema-registry/develop/api.html#get--config>`__
+        """
+        url_path: str = "/config"
+        req = self.client.get(url_path)
+        return req
+
+    def put_config(
+        self,
+        alias: str = None,
+        normalize: bool = False,
+        compatibility: str | CompatibilityMode = "NONE",
+    ):
+        """
+        `API Doc <https://docs.confluent.io/platform/current/schema-registry/develop/api.html#put--config>`__
+        """
+        url_path: str = "/config"
+        payload: dict = {}
+        if compatibility:
+            payload["compatibility"] = compatibility
+        if alias:
+            payload["alias"] = alias
+        if normalize:
+            payload["normalize"] = normalize
+        req = self.client.put(url_path, json=payload)
+        return req
+
+    def get_subject_config(
+        self,
+        subject: str,
+        default: bool = False,
+        alias: str = None,
+        normalize: bool = False,
+        compatibility: str | CompatibilityMode = "NONE",
+    ):
+        """
+        `API Doc <https://docs.confluent.io/platform/current/schema-registry/develop/api.html#get--config>`__
+        """
+        url_path: str = f"/config/{subject}"
+        if default:
+            url_path += "?defaultToGlobal=true"
+        payload: dict = {}
+        if compatibility:
+            payload["compatibility"] = compatibility
+        if alias:
+            payload["alias"] = alias
+        if normalize:
+            payload["normalize"] = normalize
+        req = self.client.get(url_path, json=payload)
+        return req
+
+    def put_subject_config(
+        self,
+        subject: str,
+        alias: str = None,
+        normalize: bool = False,
+        compatibility: str | CompatibilityMode = "NONE",
+    ):
+        """
+        `API Doc <https://docs.confluent.io/platform/current/schema-registry/develop/api.html#put--config>`__
+        """
+        url_path: str = f"/config/{subject}"
+        payload: dict = {}
+        if compatibility:
+            payload["compatibility"] = compatibility
+        if alias:
+            payload["alias"] = alias
+        if normalize:
+            payload["normalize"] = normalize
+        req = self.client.put(url_path, json=payload)
+        return req
+
+    def delete_subject_config(
+        self,
+        subject: str,
+        alias: str = None,
+        normalize: bool = False,
+        compatibility: str | CompatibilityMode = "NONE",
+    ):
+        """
+        `API Doc <https://docs.confluent.io/platform/current/schema-registry/develop/api.html#delete--config-(string-%20subject)>`__
+        """
+        url_path: str = f"/config/{subject}"
+        req = self.client.delete(url_path)
         return req
