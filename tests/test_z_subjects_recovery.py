@@ -6,8 +6,9 @@ from copy import deepcopy
 import pytest
 
 from kafka_schema_registry_admin.client_wrapper.errors import (
-    IncompatibleSchema,
     NotFoundException,
+    UnexpectedException,
+    UnprocessableEntity,
 )
 
 
@@ -54,3 +55,48 @@ def test_import_schema(local_registry, schema_sample):
     )
     print("Restored test-subject4", schema.json())
     assert schema.status_code in range(200, 300) and schema.json()["id"] == 42
+
+    local_registry.delete_subject("test-subject4", permanent=True)
+
+
+def test_import_schema_v2(local_registry, schema_sample):
+    try:
+        local_registry.get_subject_versions("test-subject4")
+    except NotFoundException:
+        print("Subject not found")
+    found = local_registry.get_all_subjects(
+        deleted=True, subject_prefix="test-subject4"
+    ).json()
+    print("FOUND ANY?", found)
+
+    local_registry.put_mode("IMPORT", force=True)
+    local_registry.put_subject_mode("test-subject4", "IMPORT")
+    schema = local_registry.post_subject_schema_version(
+        "test-subject4", schema_sample, version_id=1, schema_id=43, schema_type="AVRO"
+    )
+    print("Restored test-subject4", schema.json())
+    assert schema.status_code in range(200, 300) and schema.json()["id"] == 43
+
+    local_registry.delete_subject("test-subject4", permanent=True)
+
+
+def test_fail_import_schema_v2(local_registry, schema_sample):
+    try:
+        local_registry.get_subject_versions("test-subject4")
+    except NotFoundException:
+        print("Subject not found")
+    found = local_registry.get_all_subjects(
+        deleted=True, subject_prefix="test-subject4"
+    ).json()
+    print("FOUND ANY?", found)
+
+    local_registry.put_mode("READWRITE")
+    local_registry.put_subject_mode("test-subject4", "READWRITE")
+    with pytest.raises(UnprocessableEntity):
+        local_registry.post_subject_schema_version(
+            "test-subject4",
+            schema_sample,
+            version_id=1,
+            schema_id=43,
+            schema_type="AVRO",
+        )

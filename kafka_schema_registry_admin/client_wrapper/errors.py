@@ -85,6 +85,11 @@ class ForbiddenException(ApiGenericException):
         super().__init__("Forbidden", code, details)
 
 
+class UnprocessableEntity(ApiGenericException):
+    def __init__(self, code, details):
+        super().__init__("Unprocessable Entity", code, details)
+
+
 class UnexpectedException(ApiGenericException):
     def __init__(self, code, details):
         super().__init__("Unexpected Error", code, details)
@@ -100,6 +105,7 @@ class SchemaRegistryApiException(ApiGenericException):
         404: NotFoundException,
         401: UnauthorizedException,
         403: ForbiddenException,
+        422: UnprocessableEntity,
     }
 
     def __init__(self, code, details):

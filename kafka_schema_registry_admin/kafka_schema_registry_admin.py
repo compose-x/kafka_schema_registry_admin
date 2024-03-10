@@ -178,19 +178,6 @@ class SchemaRegistry:
                 url = f"{url}?normalize=true"
             """When trying to do recovery, SR must be in import mode either globally or for the subject itself."""
             if version_id and schema_id:
-                registry_mode = self.get_mode(as_str=True)
-                try:
-                    subject_mode = self.get_subject_mode(subject_name).json()["mode"]
-                except NotFoundException:
-                    subject_mode = None
-                if registry_mode != RegistryMode.IMPORT.value and (
-                    subject_mode and subject_mode != RegistryMode.IMPORT.value
-                ):
-                    raise Exception(
-                        f"SR or subject {subject_name} must be in {RegistryMode.IMPORT.value}. Got",
-                        registry_mode,
-                        subject_mode,
-                    )
                 payload["version"] = version_id
                 payload["id"] = schema_id
 

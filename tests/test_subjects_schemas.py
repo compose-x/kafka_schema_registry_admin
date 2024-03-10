@@ -85,7 +85,6 @@ def test_register_new_definition_updated(local_registry, schema_sample):
         test.json()["version"],
         new_version,
         verbose=True,
-        schema_type="AVRO",
     )
     assert isinstance(compat.json()["is_compatible"], bool)
     is_compatible = compat.json()["is_compatible"]

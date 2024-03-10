@@ -17,6 +17,7 @@ docker_compose = DockerCompose(
     pull=True,
 )
 
+docker_compose.stop(down=True)
 docker_compose.start()
 sr_port = int(docker_compose.get_service_port("schema-registry", 8081))
 base_url: str = f"http://localhost:{sr_port}"
