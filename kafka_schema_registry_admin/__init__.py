@@ -7,6 +7,6 @@ __author__ = """JohnPreston"""
 __email__ = "john@ews-network.net"
 __version__ = "0.4.0"
 
-from .kafka_schema_registry_admin import SchemaRegistry
+from .kafka_schema_registry_admin import CompatibilityMode, RegistryMode, SchemaRegistry
 
-__all__ = ["SchemaRegistry"]
+__all__ = ["SchemaRegistry", "RegistryMode", "CompatibilityMode"]
